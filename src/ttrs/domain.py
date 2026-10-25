@@ -42,6 +42,14 @@ def today() -> str:
     return datetime.now(UTC).date().isoformat()
 
 
+def display_time(value: object) -> str:
+    """Show timetable minutes without changing the underlying UTC instant."""
+    text = str(value)
+    if re.match(r"^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::|$)", text):
+        return text[:16].replace("T", " ")
+    return text
+
+
 def money(amount: object, currency: str = "CNY") -> str:
     if amount is None:
         return "未报价"

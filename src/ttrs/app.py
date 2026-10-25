@@ -21,7 +21,7 @@ from .auth import SignatureError
 from .client import APIError, TicketClient
 from .config import Config, state_path
 from .demo import DEMO_KEY, STATIONS, DemoServer
-from .domain import money, parse_date, parse_travel_date, sale_payload, today
+from .domain import display_time, money, parse_date, parse_travel_date, sale_payload, today
 from .flow import JourneyFlow
 from .receipt import export_name, export_ticket
 from .runtime import ProcessMonitor, format_status
@@ -582,14 +582,20 @@ class TicketApp(App):
                 str(i + 1),
                 Text(f"{journey.get('train_number') or '—'} / {journey['id']}"),
                 Text(label),
-                Text(str(journey["departure_at"])),
-                Text(str(journey["arrival_at"])),
+                Text(display_time(journey["departure_at"])),
+                Text(display_time(journey["arrival_at"])),
                 str(journey["available"]),
                 Text(money(journey.get("amount_minor"), journey.get("currency", "CNY"))),
                 key=str(i),
             )
         self.query_one("#journey-panel").border_title = f"{date} UTC · {len(self.journeys)} 条（最多 200）"
         table.focus()
+        unavailable = sum(j.get("fare_available") is False for j in self.journeys)
+        if unavailable:
+            self.notify(
+                f"{unavailable} 条行程无法报价；后端可能因缺少里程将可售余票置零，请检查后端里程数据",
+                severity="warning",
+            )
         if not self.journeys:
             self.notify("没有符合条件的区间；请确认 UTC 日期、站点和运行图是否已导入")
 
@@ -873,7 +879,7 @@ class TicketApp(App):
         for stop in detail.get("stops", []):
             lines.append(
                 f"{stop['seq']:>3}  {names.get(stop['station_id'], stop['station_id'])}\n"
-                f"     到 {stop.get('arrival_at', '—')}  开 {stop.get('departure_at', '—')}"
+                f"     到 {display_time(stop.get('arrival_at', '—'))}  开 {display_time(stop.get('departure_at', '—'))}"
             )
         await self.modal(MessageScreen("逐站时刻", "\n".join(lines)))
 

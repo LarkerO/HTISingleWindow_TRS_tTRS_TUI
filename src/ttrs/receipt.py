@@ -9,7 +9,7 @@ from rich.cells import cell_len
 from rich.console import Console
 from rich.text import Text
 
-from .domain import money
+from .domain import display_time, money
 
 
 def clean(value: object) -> str:
@@ -25,7 +25,7 @@ def receipt_lines(ticket: dict, stations: dict[str, str]) -> list[str]:
         f"旅客：{ticket.get('passenger', '未提供')}",
         f"票价：{money(ticket.get('amount_minor'), ticket.get('currency', 'CNY'))}",
         f"出票方：{ticket.get('agency_code', '未提供')}",
-        f"出票时间 UTC：{ticket.get('issued_at', '未提供')}",
+        f"出票时间 UTC：{display_time(ticket.get('issued_at', '未提供'))}",
     ]
     document = ticket.get("passenger_document_snapshot") or {}
     number = str(document.get("document_number", ""))
@@ -50,8 +50,8 @@ def receipt_lines(ticket: dict, stations: dict[str, str]) -> list[str]:
             "",
             f"乘车联 {i}：{trip.get('train_number') or '班次 #' + str(coupon.get('trip_id', '未提供'))}",
             f"{origin_name} → {destination_name}",
-            f"出发 UTC：{origin.get('departure_at', '未提供')}",
-            f"到达 UTC：{destination.get('arrival_at', '未提供')}",
+            f"出发 UTC：{display_time(origin.get('departure_at', '未提供'))}",
+            f"到达 UTC：{display_time(destination.get('arrival_at', '未提供'))}",
             f"站序：{coupon.get('origin_seq', '—')} → {coupon.get('destination_seq', '—')}",
             f"承运方：{trip.get('operator_code', '未提供')}",
         ]

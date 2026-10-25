@@ -34,7 +34,8 @@ def test_chinese_frame_alignment_and_masked_document(ascii_mode):
     text = format_receipt(TICKET, {"a": "西安", "b": "南京"}, width=40, ascii_mode=ascii_mode)
     assert "西安 → 南京" in text
     assert "120.05 CNY" in text
-    assert "2026-10-28 01:20:00" in text
+    assert "2026-10-28 01:20" in text
+    assert "01:20:00" not in text
     assert "123456789012345678" not in text
     assert "5678" in text
     assert {cell_len(line) for line in text.splitlines()} == {44}

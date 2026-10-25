@@ -53,3 +53,11 @@ def test_travel_date_shortcuts_use_next_utc_day():
         parse_travel_date("0", ref)
     with pytest.raises(ValueError):
         parse_travel_date("+366", ref)
+
+
+def test_display_time_preserves_minute_without_rounding():
+    from ttrs.domain import display_time
+
+    assert display_time("2026-10-26 00:01:46.250") == "2026-10-26 00:01"
+    assert display_time("2026-10-26T23:59:59Z") == "2026-10-26 23:59"
+    assert display_time("—") == "—"
