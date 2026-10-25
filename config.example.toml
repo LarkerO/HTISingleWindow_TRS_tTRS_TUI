@@ -1,4 +1,5 @@
 # 密钥通过 TICKETING_API_KEY 或连接窗口输入，不写入配置文件。
+version = "0.4.0"
 base_url = "http://127.0.0.1:8000"
 agency_code = ""
 ascii = false
@@ -7,6 +8,10 @@ timeout = 20.0
 # 以 --keys 诊断页实际收到的键名为准。
 [keys]
 menu = "f10"
+mode = "f6"
+documents = "ctrl+p"
+help = "f8"
+quit = "ctrl+q,ctrl+c"
 search = "f12"
 select_row = "f9"
 issue = "alt+n"

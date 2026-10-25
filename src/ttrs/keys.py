@@ -5,11 +5,14 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.widgets import RichLog, Static
 
-from . import APP_TITLE
+from .config import Config
 
 
 class KeyApp(App):
-    TITLE = APP_TITLE + " · 按键诊断"
+    def __init__(self, *, title: str | None = None):
+        super().__init__()
+        self.title = title or Config().window_title
+
     BINDINGS: ClassVar[list[Binding]] = [Binding("ctrl+q", "quit", "退出")]
     CSS = "RichLog { border: solid cyan; height: 1fr; } Static { height: 3; }"
 

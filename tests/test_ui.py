@@ -375,3 +375,52 @@ async def test_live_runtime_footer_counts_actions_and_tracks_ticket(tmp_path):
         app.probe_server()
         await pilot.pause()
         assert app.operation_count == 3
+
+
+@pytest.mark.parametrize("size", [(120, 36), (80, 24)])
+async def test_top_menu_shortcuts_and_configured_window_title(tmp_path, size):
+    from rich.cells import cell_len
+    from textual.widgets import Static
+
+    app = TicketApp(Config(version="9.8.7", ascii=True), demo=True, store_path=tmp_path / "state.db")
+    async with app.run_test(size=size) as pilot:
+        await ready(app, pilot)
+        assert app.title == (
+            "氢气工艺服务器交通信息单一窗口 HydCraft Server Transit Information Single Windows tTRS | 9.8.7"
+        )
+        assert "9.8.7" in str(app.query_one("#identity", Static).content)
+        assert (
+            "Ctrl+Q" in str(app.query_one("#quit").label)
+            if size[0] >= 110
+            else "^Q" in str(app.query_one("#quit").label)
+        )
+        for button in app.query("#menubar Button"):
+            assert button.region.right <= size[0]
+            assert cell_len(str(button.label)) <= button.content_region.width
+        for key, expected in [
+            ("f10", ChoiceScreen),
+            ("f6", ChoiceScreen),
+            ("ctrl+o", MessageScreen),
+            ("ctrl+p", FormScreen),
+            ("ctrl+g", FormScreen),
+            ("f8", MessageScreen),
+            ("ctrl+q", MessageScreen),
+        ]:
+            app.query_one("#date", Input).focus()
+            await pilot.press(key)
+            await pilot.pause()
+            assert isinstance(app.screen, expected), key
+            await pilot.press("escape")
+            await ready(app, pilot)
+
+
+async def test_configured_top_menu_alias_is_shown_and_works(tmp_path):
+    app = TicketApp(Config(keys={"help": "f7"}), demo=True, store_path=tmp_path / "state.db")
+    async with app.run_test(size=(120, 36)) as pilot:
+        await ready(app, pilot)
+        assert "F7" in str(app.query_one("#help").label)
+        await pilot.press("f7")
+        await pilot.pause()
+        assert isinstance(app.screen, MessageScreen)
+        await pilot.press("escape")
+        await ready(app, pilot)

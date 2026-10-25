@@ -67,6 +67,18 @@ Windows 也可用 run.ps1，受 PowerShell 签名策略限制时使用 run.cmd�
 uv run --locked ttrs --config config.local.toml
 ```
 
+## 窗口标题与本地版本
+
+窗口标题格式为：
+
+```text
+氢气工艺服务器交通信息单一窗口 HydCraft Server Transit Information Single Windows tTRS | 0.4.0
+```
+
+默认版本号读取随程序安装的 src/ttrs/version.toml。可在本地 config.local.toml 或 --config 指定的 TOML 中设置 version = "0.4.0" 覆盖，不需要修改 Python 源码。配置优先级为：显式 --config → 工作目录 config.local.toml → 程序默认配置。启动脚本会将工作目录切到项目根目录。
+
+主界面保留简短中文标头，并显示同一个配置版本号；按键诊断窗口也使用完整窗口标题。
+
 ## 售票流程
 
 1. **选择区间**：F1 输入日期，F2 可填车次，F3 / F4 选择发站和到站。
@@ -99,6 +111,7 @@ uv run --locked ttrs --config config.local.toml
 | F1 / F2 | 日期 / 车次 |
 | F3 / F4 / F5 | 发站 / 到站 / 旅客 |
 | F6 | 选择业务模式 |
+| Ctrl+P / F8 | 证件库 / 帮助（主界面） |
 | F9 | 切换余票与待办表 |
 | F10 / F12 | 菜单 / 查询余票 |
 | Enter | 当前表格取入待办或打开订单；表单下一项 |
@@ -110,6 +123,8 @@ uv run --locked ttrs --config config.local.toml
 | Ctrl+Q / Ctrl+C | 主界面退出 |
 | 表单 F1–F7 / F8 / Esc | 定位字段 / 提交 / 返回 |
 | 票面 F7 / F8 | 原始数据 / 导出 |
+
+顶部按钮直接显示快捷键：菜单 F10、业务 F6、连接 Ctrl+O、证件 Ctrl+P、查退 Ctrl+G、帮助 F8、退出 Ctrl+Q。小窗口用 ^ 表示 Ctrl，例如 ^Q。附加键位配置会同步更新按钮显示。
 
 快捷键按当前窗口生效，普通字母可正常输入。所有业务也有按钮或菜单入口。笔记本功能键可能需要 Fn；终端可能截获 F11、Alt 或 Ctrl 组合键。用 --keys 查看程序实际收到的键名，再通过配置增加替代键。
 

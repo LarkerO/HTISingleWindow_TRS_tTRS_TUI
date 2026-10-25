@@ -79,7 +79,7 @@ async def exercise(base: str, fixture: dict, data: Path, checks: list[str]) -> N
         checks.append("real passenger document registration")
         app = TicketApp(Config(base_url=base), store_path=data / "orders.sqlite3")
         async with app.run_test(size=(120, 36)) as pilot:
-            assert app.title == APP_TITLE
+            assert app.title == app.config.window_title
             assert APP_TITLE in str(app.query_one("#identity", Static).content)
             await pilot.press("ctrl+o")
             await until(pilot, lambda: isinstance(app.screen, FormScreen), "connection form")

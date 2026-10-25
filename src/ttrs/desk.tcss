@@ -61,3 +61,5 @@ Screen.compact #totals { height: 1; }
 .ascii #status { border-top: ascii #526779; }
 Screen.compact #menubar { height: 1; }
 Screen.compact #menubar Button { height: 1; border: none; }
+
+#menubar Button { width: 1fr; min-width: 6; padding: 0; margin-right: 0; }

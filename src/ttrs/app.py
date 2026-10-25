@@ -33,7 +33,7 @@ HELP = """tTRS 0.4 操作说明
 F1 日期（UTC） / F2 车次 / F3 发站 / F4 到站 / F5 旅客
 F9 切换余票与待办表格；方向键选择，Enter 取入待办或查看订单
 F12 查余票 / Alt+R 取入待办 / Alt+N 出票 / Alt+E 取消未提交待办
-Ctrl+O 连接 / Ctrl+G 查票与退票 / Ctrl+F12 逐站时刻 / F10 菜单
+Ctrl+O 连接 / Ctrl+P 证件库 / Ctrl+G 查票与退票 / Ctrl+F12 逐站时刻 / F10 菜单 / F8 帮助
 Ctrl+Q 或 Ctrl+C 退出；Alt+S、Alt+D 返回售票录入
 表单：F1–F7 定位字段，Enter 下一项，F8 提交，Esc 返回
 所有操作也有可用 Tab 定位的按钮或菜单入口。
@@ -97,6 +97,8 @@ DEFAULT_KEYS = {
     "cancel_row": "alt+e",
     "ticket": "ctrl+g",
     "connect": "ctrl+o",
+    "documents": "ctrl+p",
+    "help": "f8",
     "details": "ctrl+f12",
     "quit": "ctrl+q,ctrl+c",
 }
@@ -113,6 +115,7 @@ class TicketApp(App):
     def __init__(self, config: Config | None = None, *, demo=False, store_path: Path | None = None):
         super().__init__()
         self.config, self.demo = config or Config(), demo
+        self.title = self.config.window_title
         self.client: TicketClient | None = None
         self.server = DemoServer() if demo else None
         self.outbox = Outbox(store_path or state_path(demo))
@@ -137,18 +140,22 @@ class TicketApp(App):
         self.runtime_timer = self.probe_timer = None
 
     def compose(self) -> ComposeResult:
-        yield Static(APP_TITLE + "\n未连接 · Ctrl+O 连接后端", id="identity", markup=False)
+        yield Static(
+            f"{APP_TITLE} | {self.config.version}\n未连接 · Ctrl+O 连接后端", id="identity", markup=False
+        )
         with Horizontal(id="menubar"):
             for ident, label in [
                 ("menu", "菜单"),
                 ("mode", "业务"),
                 ("connect", "连接"),
-                ("documents", "证件库"),
-                ("ticket", "查票/退票"),
+                ("documents", "证件"),
+                ("ticket", "查退"),
                 ("help", "帮助"),
                 ("quit", "退出"),
             ]:
-                yield Button(f"[{label}]", id=ident)
+                yield Button(
+                    self.menu_label(ident, label), id=ident, tooltip=label + "：" + self.menu_key(ident)
+                )
         yield Static("普通售票 · F6 业务模式", id="mode-status", markup=False)
         with Horizontal(id="fields"):
             with Vertical(classes="date-field"):
@@ -183,6 +190,37 @@ class TicketApp(App):
         yield Static("", id="key-hints", markup=False)
         yield Static("", id="status", markup=False)
 
+    def menu_key(self, action: str, compact: bool = False) -> str:
+        key = self.config.keys.get(action, DEFAULT_KEYS[action]).split(",")[0].strip()
+        display = "+".join(
+            part.upper()
+            if len(part) == 1 or part.startswith("f") and part[1:].isdigit()
+            else part.capitalize()
+            for part in key.split("+")
+        )
+        return display.replace("Ctrl+", "^") if compact else display
+
+    def menu_label(self, action: str, label: str, compact: bool = False) -> Text:
+        return Text(f"[{label} {self.menu_key(action, compact)}]")
+
+    def update_menu_labels(self, compact: bool | None = None) -> None:
+        if compact is None:
+            compact = self.size.width < 110 or self.size.height < 34
+        labels = {
+            "menu": "菜单",
+            "mode": "业务",
+            "connect": "连接",
+            "documents": "证件",
+            "ticket": "查退",
+            "help": "帮助",
+            "quit": "退出",
+        }
+        for button in self.query("#menubar Button"):
+            action = button.id
+            if action in labels:
+                button.label = self.menu_label(action, labels[action], compact)
+                button.tooltip = labels[action] + "：" + self.menu_key(action)
+
     def on_mount(self) -> None:
         self.theme = "textual-dark"
         for action, keys in self.config.keys.items():
@@ -199,6 +237,7 @@ class TicketApp(App):
         self.query_one("#journey-panel").border_title = "余票查询"
         self.query_one("#queue-panel").border_title = "待办 / 本地出票记录（F9 切换）"
         self.apply_borders()
+        self.update_menu_labels()
         hints = "F1–F5 字段 | F6 业务 | F9 选票 | F10 菜单 | F12 余票 | Alt+R 取票 | Alt+N 出票"
         if self.config.keys:
             hints = "自定义键位 | " + " | ".join(f"{a}:{k}" for a, k in self.config.keys.items())
@@ -212,7 +251,9 @@ class TicketApp(App):
 
     def on_resize(self, event) -> None:
         if self.screen_stack:
-            self.screen_stack[0].set_class(event.size.width < 110 or event.size.height < 34, "compact")
+            compact = event.size.width < 110 or event.size.height < 34
+            self.screen_stack[0].set_class(compact, "compact")
+            self.update_menu_labels(compact)
 
     def apply_borders(self) -> None:
         if self.config.ascii:
@@ -349,7 +390,9 @@ class TicketApp(App):
 
     async def handle(self, action: str) -> None:
         if action == "help":
-            await self.modal(MessageScreen("操作说明", HELP))
+            await self.modal(
+                MessageScreen("操作说明", HELP.replace("tTRS 0.4", f"tTRS {self.config.version}"))
+            )
         elif action == "quit":
             if await self.modal(
                 MessageScreen(
@@ -465,7 +508,7 @@ class TicketApp(App):
         for ident in ("origin", "destination", "passenger"):
             self.query_one("#" + ident, Button).label = "[选择]"
         self.query_one("#identity", Static).update(
-            f"{APP_TITLE}\n{'[本地演示]' if self.demo else '[已连接]'} "
+            f"{APP_TITLE} | {self.config.version}\n{'[本地演示]' if self.demo else '[已连接]'} "
             f"出票方 {agency} · {candidate.base_url} · UTC"
         )
         if self.demo:

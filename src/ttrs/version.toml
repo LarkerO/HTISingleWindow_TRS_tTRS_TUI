@@ -1,0 +1,2 @@
+# 窗口标题的默认版本号，可用 config.local.toml 或 --config 配置中的 version 覆盖。
+version = "0.4.0"
