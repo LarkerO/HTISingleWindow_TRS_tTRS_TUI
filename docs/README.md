@@ -9,6 +9,8 @@
 - [配置与窗口版本](configuration.md)：TOML、版本号和按键配置。
 - [状态栏、数据与恢复机制](runtime-and-recovery.md)：指标含义、订单恢复和功能边界。
 
+- [车站字典与电报码](station-dictionary.md)：可见站点、查询、出票及历史票面。
+
 ## 开发文档
 
 - [开发与测试](development.md)

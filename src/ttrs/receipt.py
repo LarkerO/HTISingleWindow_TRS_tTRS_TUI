@@ -9,7 +9,7 @@ from rich.cells import cell_len
 from rich.console import Console
 from rich.text import Text
 
-from .domain import display_time, money
+from .domain import display_time, money, stop_label
 
 
 def clean(value: object) -> str:
@@ -39,13 +39,8 @@ def receipt_lines(ticket: dict, stations: dict[str, str]) -> list[str]:
             coupon.get("destination") or {},
             coupon.get("trip") or {},
         )
-        origin_name = stations.get(
-            str(origin.get("station_id")), origin.get("station_name") or origin.get("station_id") or "未提供"
-        )
-        destination_name = stations.get(
-            str(destination.get("station_id")),
-            destination.get("station_name") or destination.get("station_id") or "未提供",
-        )
+        origin_name = stop_label(origin, stations)
+        destination_name = stop_label(destination, stations)
         lines += [
             "",
             f"乘车联 {i}：{trip.get('train_number') or '班次 #' + str(coupon.get('trip_id', '未提供'))}",

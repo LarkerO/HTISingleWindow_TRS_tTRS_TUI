@@ -21,7 +21,7 @@ from textual.widgets import DataTable, Input, Static
 
 from ttrs import APP_TITLE
 from ttrs.app import TicketApp
-from ttrs.client import TicketClient
+from ttrs.client import TicketClient, load_stations
 from ttrs.config import Config
 from ttrs.screens import ChoiceScreen, FormScreen, MessageScreen, ReceiptScreen, StationScreen
 
@@ -50,10 +50,14 @@ async def exercise(base: str, fixture: dict, data: Path, checks: list[str]) -> N
         identity = (await client.request("GET", "/api/v1/me"))["data"]
         assert identity["agency_code"] == fixture["agency"]
         checks.append("real signed agency authentication")
-        stations = (await client.request("GET", "/api/v1/stations"))["data"]
+        stations = await load_stations(client)
         assert any(s["id"] == fixture["origin"] for s in stations)
         checks.append("real signed station catalog")
-        params = {"origin": fixture["origin"], "destination": fixture["destination"], "date": fixture["date"]}
+        params = {
+            "origin": fixture["origin_code"].lower(),
+            "destination": fixture["destination_code"],
+            "date": fixture["date"],
+        }
 
         async def quote():
             result = (await client.request("GET", "/api/v1/journeys", params=params))["data"]
@@ -89,7 +93,7 @@ async def exercise(base: str, fixture: dict, data: Path, checks: list[str]) -> N
             assert app.client is not None
             assert APP_TITLE in str(app.query_one("#identity", Static).render())
             checks.append("actual TUI connects to real backend")
-            for key, station in (("f3", fixture["origin"]), ("f4", fixture["destination"])):
+            for key, station in (("f3", fixture["origin_code"].lower()), ("f4", fixture["destination_code"])):
                 await pilot.press(key)
                 await until(pilot, lambda: isinstance(app.screen, StationScreen), "station picker")
                 app.screen.query_one(Input).value = station
@@ -115,6 +119,9 @@ async def exercise(base: str, fixture: dict, data: Path, checks: list[str]) -> N
             await pilot.press("enter")
             await until(pilot, lambda: not app.busy, "durable draft")
             assert len(app.drafts) == 1
+            draft = app.outbox.drafts(app.scope)[0]
+            assert draft["payload"]["origin"] == fixture["origin_code"]
+            assert draft["payload"]["destination"] == fixture["destination_code"]
             await pilot.press("alt+n")
             await until(pilot, lambda: isinstance(app.screen, MessageScreen), "issue confirmation")
             await pilot.click("#yes")
@@ -122,6 +129,7 @@ async def exercise(base: str, fixture: dict, data: Path, checks: list[str]) -> N
             order = app.outbox.list(app.scope)[0]
             ticket = order["ticket"]
             assert ticket["status"] == "OPEN"
+            assert ticket["coupons"][0]["origin"]["station"]["telegraph_code"] == fixture["origin_code"]
             assert ticket["passenger_document_id"] == saved["id"]
             assert int(ticket["amount_minor"]) == int(before["amount_minor"])
             checks.append("actual TUI issues real PHP ticket with document and fare version")

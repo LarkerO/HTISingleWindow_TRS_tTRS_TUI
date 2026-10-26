@@ -8,6 +8,7 @@ from copy import deepcopy
 import httpx
 
 from .auth import mac, sm3
+from .domain import station_matches
 
 DEMO_KEY = "ttrs-local-demonstration-only"
 STATIONS = [
@@ -15,6 +16,30 @@ STATIONS = [
     {"id": "minecraft/overworld:9223372036854775702", "name": "郑州", "dimension": "minecraft/overworld"},
     {"id": "minecraft/overworld:9223372036854775703", "name": "南京", "dimension": "minecraft/overworld"},
 ]
+
+for station, code, english in zip(
+    STATIONS, ("XAY", "ZZF", "NJH"), ("Xi'an", "Zhengzhou", "Nanjing"), strict=True
+):
+    station.update(
+        telegraph_code=code,
+        name_zh=station["name"],
+        name_en=english,
+        visible=True,
+        operator_code="DEMO",
+        admin_level_1="演示省",
+        admin_level_2="演示市",
+    )
+
+
+def resolve_station(reference: str) -> str:
+    return next(
+        (s["id"] for s in STATIONS if reference.upper() == s["telegraph_code"] or reference == s["id"]),
+        reference,
+    )
+
+
+def station_metadata(reference: str) -> dict | None:
+    return next((dict(s) for s in STATIONS if s["id"] == resolve_station(reference)), None)
 
 
 def signed_response(request: httpx.Request, status: int, data: dict, key: str = DEMO_KEY) -> httpx.Response:
@@ -84,11 +109,11 @@ class DemoServer:
             }
         elif path.endswith("/stations"):
             q = request.url.params.get("q", "")
-            result = [s for s in STATIONS if q in s["name"]]
+            result = [s for s in STATIONS if station_matches(s, q)]
         elif path.endswith("/journeys"):
             self.date = request.url.params["date"]
-            self.origin = request.url.params["origin"]
-            self.destination = request.url.params["destination"]
+            self.origin = resolve_station(request.url.params["origin"])
+            self.destination = resolve_station(request.url.params["destination"])
             used = sum(t["status"] == "OPEN" for t in self.tickets.values())
             result = [
                 {
@@ -148,6 +173,7 @@ class DemoServer:
                         "seq": i,
                         "station_id": s["id"],
                         "name": s["name"],
+                        "station": dict(s),
                         "arrival_at": self.date + f" {8 + i:02}:30:00",
                         "departure_at": self.date + f" {8 + i:02}:32:00",
                     }
@@ -208,10 +234,12 @@ class DemoServer:
                             "trip": {"train_number": journey.get("train_number"), "operator_code": "DEMO"},
                             "origin": {
                                 "station_id": quote.get("origin", self.origin),
+                                "station": station_metadata(quote.get("origin", self.origin)),
                                 "departure_at": journey.get("departure_at", "未提供"),
                             },
                             "destination": {
                                 "station_id": quote.get("destination", self.destination),
+                                "station": station_metadata(quote.get("destination", self.destination)),
                                 "arrival_at": journey.get("arrival_at", "未提供"),
                             },
                             "trip_id": body["trip_id"],

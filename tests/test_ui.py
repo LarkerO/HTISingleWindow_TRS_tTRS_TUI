@@ -317,7 +317,7 @@ async def test_readable_ticket_raw_view_and_explicit_export(tmp_path, monkeypatc
         assert isinstance(app.screen, ReceiptScreen)
         assert app.screen.query_one("#export").region.bottom <= size[1]
         assert app.screen.query_one("#back").region.right <= size[0]
-        assert "西安 → 南京" in app.screen.text
+        assert "西安 (XAY) → 南京 (NJH)" in app.screen.text
         assert "120.00 CNY" in app.screen.text
         assert not (tmp_path / "receipt.txt").exists()
         await pilot.press("f7")
@@ -424,3 +424,24 @@ async def test_configured_top_menu_alias_is_shown_and_works(tmp_path):
         assert isinstance(app.screen, MessageScreen)
         await pilot.press("escape")
         await ready(app, pilot)
+
+
+async def test_telegraph_picker_query_and_durable_issue_payload(tmp_path):
+    app = TicketApp(demo=True, store_path=tmp_path / "state.db")
+    async with app.run_test(size=(120, 36)) as pilot:
+        await ready(app, pilot)
+        await pilot.press("f3")
+        await pilot.pause()
+        app.screen.query_one(Input).value = "xay"
+        await pilot.press("enter")
+        await ready(app, pilot)
+        assert app.origin_station["telegraph_code"] == "XAY"
+        await pilot.press("f12")
+        await ready(app, pilot)
+        assert app.server.origin == app.origin_station["id"]
+        await pilot.press("enter")
+        await ready(app, pilot)
+        payload = app.outbox.drafts(app.scope)[0]["payload"]
+        assert payload["origin"] == "XAY"
+        assert payload["destination"] == "NJH"
+        assert payload["origin_seq"] == 0 and payload["destination_seq"] == 2

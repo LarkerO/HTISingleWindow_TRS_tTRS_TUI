@@ -4,7 +4,7 @@
 
 ## 功能
 
-- 车站、车次、余票和逐站时刻查询。
+- 车站字典、电报码 / 中英文名 / 拼音检索，车次、余票和逐站时刻查询。
 - 旅客证件管理、出票、查票与整票退票。
 - 往返／联程连续录入，待办保存和断线恢复。
 - 电子票面导出，以及时间、网络和资源状态监控。
@@ -26,6 +26,7 @@ uv run --locked ttrs
 
 - [安装与连接](docs/getting-started.md)
 - [使用教程与快捷键](docs/user-guide.md)
+- [车站字典与电报码](docs/station-dictionary.md)
 - [配置与窗口版本](docs/configuration.md)
 - [状态栏、数据与恢复机制](docs/runtime-and-recovery.md)
 - [开发与测试](docs/development.md)

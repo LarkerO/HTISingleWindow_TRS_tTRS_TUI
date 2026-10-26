@@ -173,3 +173,32 @@ class TicketClient:
         if response.status_code not in {200, 201}:
             raise ValueError(f"非预期 HTTP 状态 {response.status_code}")
         return result
+
+
+async def load_stations(client, query: str = "") -> list[dict]:
+    """Read every public catalog page, without silently truncating at 500."""
+    stations: dict[str, dict] = {}
+    page = 1
+    count = 0
+    while True:
+        reply = await client.request("GET", "/api/v1/stations", params={"q": query, "page": page})
+        rows = reply.get("data")
+        if not isinstance(rows, list) or any(not isinstance(s, dict) or not s.get("id") for s in rows):
+            raise ProtocolError("车站列表响应结构不正确")
+        before = len(stations)
+        for station in rows:
+            stations[str(station["id"])] = station
+        count += len(rows)
+        total = reply.get("total")
+        if total is None or (isinstance(total, int) and not isinstance(total, bool) and count >= total):
+            break
+        if (
+            not isinstance(total, int)
+            or isinstance(total, bool)
+            or total < 0
+            or not rows
+            or len(stations) == before
+        ):
+            raise ProtocolError("车站分页响应不完整，请重新连接或查询")
+        page += 1
+    return [s for s in stations.values() if s.get("visible") not in (False, 0, "0")]

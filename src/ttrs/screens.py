@@ -12,7 +12,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Input, Label, ListItem, ListView, Static
 
 from .auth import SignatureError
-from .client import APIError
+from .client import APIError, load_stations
 from .domain import station_matches
 
 
@@ -149,8 +149,8 @@ class StationScreen(ModalScreen[dict | None]):
     def compose(self) -> ComposeResult:
         with Vertical(id="dialog"):
             yield Static(self.heading, classes="dialog-title", markup=False)
-            yield Input(placeholder="站名 / 拼音 / 首字母 / 完整站 ID", id="station-filter")
-            yield Static("本地匹配；服务器每次最多返回 500 站，可按中文站名重新查询。", markup=False)
+            yield Input(placeholder="电报码 / 中文名 / 英文名 / 拼音 / 站 ID", id="station-filter")
+            yield Static("仅显示可见车站；支持电报码和拼音检索，服务器查询会刷新全部匹配页。", markup=False)
             yield DataTable(id="station-results", cursor_type="row", zebra_stripes=True)
             with Horizontal(classes="dialog-actions"):
                 yield Button("[选择]", id="choose", variant="primary")
@@ -158,7 +158,7 @@ class StationScreen(ModalScreen[dict | None]):
                 yield Button("[返回 Esc]", id="back")
 
     def on_mount(self) -> None:
-        self.query_one(DataTable).add_columns("站名", "维度", "车站 ID")
+        self.query_one(DataTable).add_columns("电报码", "中文站名", "英文站名", "归属企业", "行政区", "维度")
         self.filter("")
         self.query_one(Input).focus()
 
@@ -168,9 +168,14 @@ class StationScreen(ModalScreen[dict | None]):
         table.clear()
         for i, station in enumerate(self.filtered):
             table.add_row(
-                Text(str(station["name"])),
+                Text(str(station.get("telegraph_code") or "—")),
+                Text(str(station.get("name_zh") or station["name"])),
+                Text(str(station.get("name_en") or "—")),
+                Text(str(station.get("operator_code") or "—")),
+                Text(
+                    " / ".join(str(station[k]) for k in ("admin_level_1", "admin_level_2") if station.get(k))
+                ),
                 Text(str(station.get("dimension", ""))),
-                Text(str(station["id"])),
                 key=str(i),
             )
 
@@ -203,8 +208,7 @@ class StationScreen(ModalScreen[dict | None]):
         query = self.query_one(Input).value.strip()
         button.disabled = True
         try:
-            reply = await self.client.request("GET", "/api/v1/stations", params={"q": query})
-            self.stations = reply["data"]
+            self.stations = await load_stations(self.client, query)
             self.filter(self.query_one(Input).value)
         except (APIError, SignatureError, httpx.HTTPError, ValueError, KeyError) as exc:
             self.notify(str(exc), severity="error")

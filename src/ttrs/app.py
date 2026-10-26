@@ -18,10 +18,20 @@ from textual.widgets import Button, DataTable, Input, Static
 
 from . import APP_TITLE
 from .auth import SignatureError
-from .client import APIError, TicketClient
+from .client import APIError, TicketClient, load_stations
 from .config import Config, state_path
 from .demo import DEMO_KEY, STATIONS, DemoServer
-from .domain import display_time, money, parse_date, parse_travel_date, sale_payload, today
+from .domain import (
+    display_time,
+    money,
+    parse_date,
+    parse_travel_date,
+    sale_payload,
+    station_label,
+    station_reference,
+    stop_label,
+    today,
+)
 from .flow import JourneyFlow
 from .receipt import export_name, export_ticket
 from .runtime import ProcessMonitor, format_status
@@ -53,7 +63,7 @@ Ctrl+3/4、Ctrl+H 不作为业务入口。使用 --keys 诊断、--config 修改
 本地订单库含旅客和客票数据，不保存 API 密钥，请按业务数据保护。
 票面 F7 查看原始数据、F8 导出 TXT/JSON；TXT 默认遮蔽证件号码。
 
-支持：车站和拼音检索、区间余票与报价、逐站时刻、证件查询与登记、
+支持：车站电报码、中英文名和拼音检索、区间余票与报价、逐站时刻、证件查询与登记、
 姓名或证件出票、持久化幂等恢复、查票、整票退票。
 后端暂未提供：席位分配、折扣、用途票额、付款、改签、通票签证、
 纸票打印和交班结算。这些功能不会显示为可办理。
@@ -487,7 +497,7 @@ class TicketApp(App):
             identity = (await candidate.request("GET", "/api/v1/me"))["data"]
             if identity.get("role") not in {"admin", "agency"}:
                 raise ValueError("运营方身份不能使用售票窗口，请使用出票方或管理员密钥")
-            stations = (await candidate.request("GET", "/api/v1/stations"))["data"]
+            stations = await load_stations(candidate)
         except BaseException:
             await candidate.close()
             raise
@@ -545,7 +555,7 @@ class TicketApp(App):
                 self.origin_station = selected
             else:
                 self.destination_station = selected
-            self.query_one("#" + which, Button).label = Text(str(selected["name"]))
+            self.query_one("#" + which, Button).label = Text(station_label(selected))
             if not any(s["id"] == selected["id"] for s in self.stations):
                 self.stations.append(selected)
             self.clear_journeys()
@@ -562,8 +572,8 @@ class TicketApp(App):
         self.clear_journeys()
         captured, generation = self.context(), self.query_number
         params = {
-            "origin": self.origin_station["id"],
-            "destination": self.destination_station["id"],
+            "origin": station_reference(self.origin_station),
+            "destination": station_reference(self.destination_station),
             "date": date,
         }
         params.update(self.flow.window(date))
@@ -576,7 +586,7 @@ class TicketApp(App):
         self.journeys = [j for j in result["data"] if self.flow.accepts(j["departure_at"])]
         self.query_context = captured
         table = self.query_one("#journeys", DataTable)
-        label = self.origin_station["name"] + " → " + self.destination_station["name"]
+        label = station_label(self.origin_station) + " → " + station_label(self.destination_station)
         for i, journey in enumerate(self.journeys):
             table.add_row(
                 str(i + 1),
@@ -718,8 +728,12 @@ class TicketApp(App):
         if not self.passenger_name and not self.document_id:
             return
         payload = sale_payload(journey, self.passenger_name, self.document_id)
+        # Persist codes alongside the exact sequences so loop calls stay unambiguous on retry.
+        for key, station in (("origin", self.origin_station), ("destination", self.destination_station)):
+            if station and station.get("telegraph_code"):
+                payload[key] = station_reference(station)
         label = f"{journey.get('train_number') or journey['id']} " + (
-            self.origin_station["name"] + " → " + self.destination_station["name"]
+            station_label(self.origin_station) + " → " + station_label(self.destination_station)
         )
         key = self.outbox.save_draft(self.scope, payload, label, self.passenger_name, journey)
         self.refresh_queue(key)
@@ -729,9 +743,9 @@ class TicketApp(App):
         )
         if next_stations:
             self.origin_station, self.destination_station = next_stations
-            self.query_one("#origin", Button).label = Text(str(self.origin_station["name"]))
+            self.query_one("#origin", Button).label = Text(station_label(self.origin_station))
             self.query_one("#destination", Button).label = (
-                Text(str(self.destination_station["name"])) if self.destination_station else "[选择]"
+                Text(station_label(self.destination_station)) if self.destination_station else "[选择]"
             )
             self.query_one("#date", Input).value = self.flow.earliest.date().isoformat()
             self.query_one("#train", Input).value = ""
@@ -878,7 +892,7 @@ class TicketApp(App):
         lines = [f"班次 #{journey['id']} · UTC"]
         for stop in detail.get("stops", []):
             lines.append(
-                f"{stop['seq']:>3}  {names.get(stop['station_id'], stop['station_id'])}\n"
+                f"{stop['seq']:>3}  {stop_label(stop, names)}\n"
                 f"     到 {display_time(stop.get('arrival_at', '—'))}  开 {display_time(stop.get('departure_at', '—'))}"
             )
         await self.modal(MessageScreen("逐站时刻", "\n".join(lines)))

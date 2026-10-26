@@ -58,10 +58,15 @@ def money(amount: object, currency: str = "CNY") -> str:
 
 def station_matches(station: dict, query: str) -> bool:
     query = query.strip().casefold()
-    name = str(station["name"])
+    if station.get("visible") in (False, 0, "0"):
+        return False
+    name = str(station.get("name_zh") or station["name"])
     candidates = [
         name,
         station["id"],
+        station.get("telegraph_code", ""),
+        station.get("name_en", ""),
+        station.get("source_name", ""),
         "".join(lazy_pinyin(name)),
         "".join(lazy_pinyin(name, style=Style.FIRST_LETTER)),
     ]
@@ -91,3 +96,26 @@ def sale_payload(journey: dict, passenger: str, document_id: str = "") -> dict:
     if journey.get("fare_version") is not None:
         payload["fare_version"] = int(journey["fare_version"])
     return payload
+
+
+def station_reference(station: dict) -> str:
+    """Prefer the dictionary code; keep legacy IDs for older servers."""
+    return str(station.get("telegraph_code") or station["id"])
+
+
+def station_label(station: dict) -> str:
+    name = str(station.get("name_zh") or station.get("name") or station.get("station_id") or "未提供")
+    code = station.get("telegraph_code")
+    return f"{name} ({code})" if code else name
+
+
+def stop_label(stop: dict, stations: dict[str, str]) -> str:
+    """Ticket metadata remains available even when a station is now hidden."""
+    if stop.get("station"):
+        return station_label(stop["station"])
+    return str(
+        stations.get(str(stop.get("station_id")))
+        or stop.get("station_name")
+        or stop.get("station_id")
+        or "未提供"
+    )

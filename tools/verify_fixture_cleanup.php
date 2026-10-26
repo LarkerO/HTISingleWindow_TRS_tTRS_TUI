@@ -9,6 +9,8 @@ if (!preg_match('/^[A-F0-9]{10}$/', $suffix)) {
     throw new RuntimeException('Invalid fixture suffix');
 }
 $counts = [
+    'stations' => think\facade\Db::table('stations')->where('dimension', 'passenger-ui/' . $suffix)->count(),
+    'station_dictionary' => think\facade\Db::table('station_dictionary')->where('operator_code', 'PD' . $suffix)->count(),
     'trips' => think\facade\Db::table('trips')->where('dimension', 'passenger-ui/' . $suffix)->count(),
     'tickets' => think\facade\Db::table('tickets')->where('agency_code', 'PA' . $suffix)->count(),
     'agencies' => think\facade\Db::table('agencies')->where('code', 'PA' . $suffix)->count(),
